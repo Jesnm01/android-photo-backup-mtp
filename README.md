@@ -1,31 +1,80 @@
-﻿# Copia Fotos Móvil (MTP) a PC 📱💻
+﻿# Copia Fotos Móvil (MTP) a PC
 
-Un pequeño conjunto de scripts en PowerShell y Batch para automatizar la copia de seguridad de tus fotos y vídeos desde un móvil Android a tu PC usando un cable USB, sin necesidad de nubes de terceros y sin duplicar archivos.
+Script en PowerShell para hacer copias incrementales de fotos y vídeos desde Android por USB (MTP), preservando carpetas y evitando duplicados típicos.
 
-## 🚀 Características
-- **Copia Inteligente**: Solo copia las fotos nuevas que no estén ya en el PC.
-- **Filtro de Basura**: Ignora automáticamente las cachés de Android (`Android/data`), carpetas ocultas (`.thumbnails`) y los medios de WhatsApp, para asegurar que la copia sea rápida y solo de tus fotos reales.
-- **Preserva Álbumes**: La estructura de carpetas (álbumes) del móvil se mantiene idéntica en el PC.
-- **Doble Copia de Seguridad**: Permite copiar simultáneamente a dos discos o ubicaciones diferentes.
-- **Historial de Logs**: Cada ejecución genera un informe detallado en la carpeta `Logs/` para que puedas revisar qué se ha copiado.
+## Qué hace bien este script
+- Copia incremental: evita recopiados cuando el archivo ya existe y coincide.
+- Preserva estructura: mantiene tu organización (`DCIM`, `Pictures`, etc.).
+- Filtra basura: excluye rutas no deseadas (`Android`, `WhatsApp`, `.thumbnails`, etc.).
+- Multi-destino: copia en una misma ejecución a varios discos o rutas.
+- Separa por móvil: crea subcarpeta por dispositivo dentro de cada destino para no mezclar móviles.
+- Log persistente: va escribiendo durante todo el proceso.
+- Benchmark siempre activo: muestra y registra `MB copiados`, `Archivos/min` y `MB/s aprox`.
 
-## 📂 Estructura de Archivos
-- `CopiaFotosMovil.ps1`: El "cerebro" en PowerShell. Contiene la lógica de conexión al teléfono vía MTP (Media Transfer Protocol), el filtrado y la copia recursiva.
-- `EJECUTAR_COPIA.bat`: Un lanzador rápido. Hace doble clic en él para lanzar el script sin tener que abrir la consola ni pelear con los permisos de ejecución de PowerShell.
-- `Logs/`: (Generada automáticamente) Carpeta donde se guardan los resúmenes de cada copia realizada.
+## Estructura
+- `CopiaFotosMovil.ps1`: script principal.
+- `EJECUTAR_COPIA.ps1`: lanzador con tus rutas privadas.
+- `EJECUTAR_COPIA_EJEMPLO.ps1`: plantilla.
+- `LauncherAccesoDirecto.bat`: lanzador por doble clic.
+- `Logs/`: se crea automáticamente.
 
-## ⚙️ Uso
-1. Conecta el móvil al PC mediante un cable USB.
-2. Desbloquea el móvil. Aparecerá una notificación o pop-up preguntando cómo quieres usar la conexión USB.
-3. Selecciona **"Transferencia de archivos"** (o MTP). *Importante: no elijas "Solo carga".*
-4. Haz doble clic en el archivo `EJECUTAR_COPIA.bat` (o en el acceso directo del escritorio si lo tienes).
-5. Sigue las breves instrucciones en pantalla (elegir dispositivo y confirmar).
+## Flujo de uso recomendado
+1. Conecta el móvil por USB.
+2. Desbloquéalo y elige modo **Transferencia de archivos (MTP)**.
+3. Ejecuta `LauncherAccesoDirecto.bat` o `EJECUTAR_COPIA.ps1`.
+4. En modo interactivo, elige dispositivo, almacenamiento y confirma.
 
-## 🛠️ Personalización
-Si abres `CopiaFotosMovil.ps1` con el Bloc de notas, verás arriba un bloque `$CONFIG = @{ ... }`. Ahí puedes cambiar fácilmente:
-* `Destinations`: Las rutas de tu PC donde quieres que se guarden las fotos.
-* `AllowedRootFolders`: Qué carpetas del móvil quieres que se examinen (por defecto `DCIM`, `Pictures`, `Movies`).
-* `ExcludePaths`: Qué subcarpetas evitar a toda costa.
+## Parámetros del script
+`CopiaFotosMovil.ps1` acepta:
+- `-Destinos <string[]>`: rutas base de copia.
+- `-Auto`: evita preguntas; selecciona por índice.
+- `-DeviceIndex <int>`: dispositivo a usar en `-Auto` (base 1).
+- `-StorageIndex <int>`: almacenamiento a usar en `-Auto` (base 1).
+- `-NoPause`: no espera Enter al finalizar.
+- `-ShowSkipped`: muestra cada archivo omitido por duplicado.
 
-## ⚠️ Limitaciones
-Dado que el protocolo nativo MTP de Windows es un poco antiguo, la fecha de modificación del archivo en Windows puede cambiar a la fecha actual del día en que se hizo la copia. Sin embargo, **los metadatos EXIF reales de las fotos (fecha de captura, ubicación, etc.) se mantienen completamente intactos** al 100%.
+La versión visible del script está en la variable `$SCRIPT_VERSION` dentro de `CopiaFotosMovil.ps1` y se imprime al inicio de cada ejecución y en el log.
+
+Ejemplo automático:
+
+```powershell
+& "$PSScriptRoot\CopiaFotosMovil.ps1" `
+  -Destinos @("C:\BackupFotos","D:\BackupFotos") `
+  -Auto -DeviceIndex 1 -StorageIndex 1 -NoPause
+```
+
+## Duplicados y conflictos
+- Regla principal: si en destino existe archivo con mismo nombre/ruta relativa y mismo tamaño, se considera duplicado.
+- Si MTP no da tamaño fiable, se usa fallback por fecha.
+- Esto reduce al mínimo los popups de conflicto nativos de Windows en ejecuciones periódicas.
+
+## Separación por dispositivo
+Dentro de cada destino se crea una carpeta con el nombre del móvil (saneado para Windows).
+
+Ejemplo:
+- Destino base: `D:\FotosRespaldo`
+- Dispositivo: `Pixel_8`
+- Ruta final: `D:\FotosRespaldo\Pixel_8\DCIM\Camera\...`
+
+## Si se interrumpe a mitad
+- Los archivos ya copiados se mantienen.
+- El log ya escrito se mantiene (se escribe línea a línea).
+- Puede faltar solo el resumen final si se corta antes de terminar.
+
+## Configuración interna útil
+En el bloque `$CONFIG` del script:
+- `AllowedRootFolders`: carpetas raíz del móvil a escanear.
+- `ExcludePaths`: rutas a excluir.
+- `Extensions`: extensiones permitidas.
+- `CopyTimeoutSeconds`: timeout por archivo.
+
+## Mejoras futuras sugeridas
+- Modo `-DryRun` (simulación sin copiar).
+- Exportar resumen CSV o JSON de cada ejecución.
+- Reintentos automáticos para fallos puntuales de MTP.
+- Integración con Programador de tareas de Windows para ejecución periódica.
+
+## Limitaciones de MTP
+- MTP en Windows no siempre expone metadatos de forma consistente.
+- El rendimiento depende mucho de cable, puerto USB y tamaño medio de archivo.
+- EXIF interno de fotos se conserva, aunque Windows pueda mostrar fechas de modificación distintas.
