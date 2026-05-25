@@ -97,8 +97,8 @@ function Write-Banner {
     Clear-Host
     Write-Host ""
     Write-Host "  ======================================================" -ForegroundColor Cyan
-    Write-Host "      COPIA DE FOTOS MOVIL -> PC                        " -ForegroundColor Cyan
-    Write-Host "      Filtro inteligente - Preserva albumes             " -ForegroundColor Cyan
+    Write-Host "      MOBILE PHOTO BACKUP -> PC                         " -ForegroundColor Cyan
+    Write-Host "      Smart filtering - Preserves albums                " -ForegroundColor Cyan
     Write-Host "  ======================================================" -ForegroundColor Cyan
     Write-Host ""
 }
@@ -128,18 +128,18 @@ function Write-Section {
 
 function Get-SafeFolderName {
     param([string]$Name)
-    if ([string]::IsNullOrWhiteSpace($Name)) { return "Dispositivo_Desconocido" }
+    if ([string]::IsNullOrWhiteSpace($Name)) { return "Unknown_Device" }
     $safe = $Name
     foreach ($c in [System.IO.Path]::GetInvalidFileNameChars()) {
         $safe = $safe.Replace($c, '_')
     }
     $safe = $safe.Trim()
-    if ([string]::IsNullOrWhiteSpace($safe)) { return "Dispositivo_Desconocido" }
+    if ([string]::IsNullOrWhiteSpace($safe)) { return "Unknown_Device" }
     return $safe
 }
 
 function Pause-IfNeeded {
-    param([string]$Message = "  Pulsa Enter para salir")
+    param([string]$Message = "  Press Enter to exit")
     if (-not $NoPause) {
         Read-Host $Message | Out-Null
     }
@@ -184,7 +184,7 @@ function Select-FromList {
     if ($AutoSelect) {
         $idx = [Math]::Max(0, [Math]::Min($Items.Count - 1, $PreferredIndex - 1))
         $label = & $GetLabel $Items[$idx]
-        Write-Log "Auto seleccion: [$($idx + 1)] $label" "DarkGray" "AUTO"
+        Write-Log "Auto selection: [$($idx + 1)] $label" "DarkGray" "AUTO"
         return $Items[$idx]
     }
 
@@ -197,7 +197,7 @@ function Select-FromList {
 
     $idx = -1
     do {
-        $raw = Read-Host "  Tu eleccion (1-$($Items.Count))"
+        $raw = Read-Host "  Your choice (1-$($Items.Count))"
         if ($raw -match '^\d+$') {
             $idx = [int]$raw - 1
         }
@@ -359,7 +359,7 @@ function Invoke-RecursiveCopy {
         $items = @($SourceFolder.Items())
     }
     catch {
-        Write-Log "No se pudo leer la carpeta: '$RelativePath'" "DarkGray" "!"
+        Write-Log "Could not read folder: '$RelativePath'" "DarkGray" "!"
         return
     }
 
@@ -390,7 +390,7 @@ function Invoke-RecursiveCopy {
                 Invoke-RecursiveCopy -SourceFolder $item.GetFolder() -RelativePath $itemRelPath
             }
             catch {
-                Write-Log "Error en carpeta '$itemRelPath': $_" "Red" "X"
+                Write-Log "Error in folder '$itemRelPath': $_" "Red" "X"
             }
         }
         else {
@@ -414,7 +414,7 @@ function Invoke-RecursiveCopy {
                 if (Test-DestinationHasSameFile -MTPItem $item -DestinationFile $destFile) {
                     $Stats.PerDestination[$destRoot].Skipped++
                     if ($CONFIG.ShowSkipped) {
-                        Write-Log "    >>   $itemRelPath  (ya existe y coincide en $destFile)" "DarkGray"
+                        Write-Log "    >>   $itemRelPath  (already exists and matches in $destFile)" "DarkGray"
                     }
                 }
                 else {
@@ -434,13 +434,13 @@ function Invoke-RecursiveCopy {
                         else {
                             $Stats.Errors++
                             $Stats.PerDestination[$destRoot].Errors++
-                            Write-Log "    FAIL  Timeout o copia inestable: $itemRelPath" "Red"
+                            Write-Log "    FAIL  Timeout or unstable copy: $itemRelPath" "Red"
                         }
                     }
                     catch {
                         $Stats.Errors++
                         $Stats.PerDestination[$destRoot].Errors++
-                        Write-Log "    FAIL  Error al copiar '$itemRelPath': $_" "Red"
+                        Write-Log "    FAIL  Error copying '$itemRelPath': $_" "Red"
                     }
                 }
             }
@@ -456,22 +456,22 @@ function Invoke-RecursiveCopy {
 # ====================================================================
 
 Write-Banner
-Write-Log "Inicio de la copia" "Cyan" "INFO"
-Write-Log "Version del script: v$SCRIPT_VERSION" "DarkGray" "INFO"
+Write-Log "Backup started" "Cyan" "INFO"
+Write-Log "Script version: v$SCRIPT_VERSION" "DarkGray" "INFO"
 if ($Auto) {
-    Write-Log "Modo automatico habilitado (sin preguntas)" "DarkGray" "AUTO"
+    Write-Log "Automatic mode enabled (no prompts)" "DarkGray" "AUTO"
 }
 
-Write-Section "Verificando destinos"
+Write-Section "Checking destinations"
 $destinosOk = $true
 foreach ($dest in $CONFIG.Destinations) {
     if (-not (Test-Path $dest)) {
         try {
             New-Item -ItemType Directory -Path $dest -Force | Out-Null
-            Write-Log "Creada carpeta: $dest" "Yellow" "DIR"
+            Write-Log "Created folder: $dest" "Yellow" "DIR"
         }
         catch {
-            Write-Log "No se pudo crear: $dest" "Red" "FAIL"
+            Write-Log "Could not create: $dest" "Red" "FAIL"
             $destinosOk = $false
         }
     }
@@ -482,46 +482,46 @@ foreach ($dest in $CONFIG.Destinations) {
 
 if (-not $destinosOk) {
     Write-Host ""
-    Write-Log "Hay destinos inaccesibles. Comprueba los discos." "Red" "FAIL"
+    Write-Log "Some destinations are inaccessible. Check your drives." "Red" "FAIL"
     Pause-IfNeeded
     exit 1
 }
 
-Write-Section "Buscando movil"
-Write-Log "Escaneando dispositivos conectados por USB..." "Yellow" "..."
-Write-Log "El movil debe estar en modo 'Transferencia de archivos (MTP)'" "DarkGray" "..."
+Write-Section "Searching for phone"
+Write-Log "Scanning USB-connected devices..." "Yellow" "..."
+Write-Log "Phone must be set to 'File transfer (MTP)' mode" "DarkGray" "..."
 Write-Host ""
 
 $devices = @(Get-MTPDevices)
 
 if ($devices.Count -eq 0) {
     Write-Host ""
-    Write-Log "No se encontro ningun dispositivo movil." "Red" "FAIL"
+    Write-Log "No mobile device found." "Red" "FAIL"
     Pause-IfNeeded
     exit 1
 }
 
-$device = Select-FromList -Prompt "Selecciona el dispositivo:" -Items $devices -AutoSelect:$Auto -PreferredIndex $DeviceIndex
+$device = Select-FromList -Prompt "Select device:" -Items $devices -AutoSelect:$Auto -PreferredIndex $DeviceIndex
 Write-Host ""
-Write-Log "Dispositivo seleccionado: $($device.Name)" "Green" "DEV"
+Write-Log "Selected device: $($device.Name)" "Green" "DEV"
 $script:DeviceFolderName = Get-SafeFolderName -Name $device.Name
-Write-Log "Subcarpeta por dispositivo: $script:DeviceFolderName" "DarkGray" "DEV"
+Write-Log "Device subfolder: $script:DeviceFolderName" "DarkGray" "DEV"
 
 $deviceFolder = $device.GetFolder()
 $storages = @($deviceFolder.Items() | Where-Object { $_.IsFolder })
 
 if ($storages.Count -eq 0) {
-    Write-Log "No se encontro almacenamiento en el dispositivo." "Red" "FAIL"
+    Write-Log "No storage found on the device." "Red" "FAIL"
     Pause-IfNeeded
     exit 1
 }
 
-$storage = Select-FromList -Prompt "Selecciona el almacenamiento:" -Items $storages -AutoSelect:$Auto -PreferredIndex $StorageIndex
-Write-Log "Almacenamiento: $($storage.Name)" "Green" "DEV"
+$storage = Select-FromList -Prompt "Select storage:" -Items $storages -AutoSelect:$Auto -PreferredIndex $StorageIndex
+Write-Log "Storage: $($storage.Name)" "Green" "DEV"
 
 Write-Host ""
 Write-Host "  ------------------------------------------------------" -ForegroundColor DarkGray
-Write-Host "  Listo para copiar a:" -ForegroundColor DarkGray
+Write-Host "  Ready to copy to:" -ForegroundColor DarkGray
 foreach ($dest in $CONFIG.Destinations) {
     $deviceDestRoot = Join-Path $dest $script:DeviceFolderName
     $short = $deviceDestRoot.Substring(0, [Math]::Min($deviceDestRoot.Length, 70))
@@ -531,24 +531,24 @@ Write-Host "  ------------------------------------------------------" -Foregroun
 Write-Host ""
 
 if (-not $Auto) {
-    $confirm = Read-Host "  Empezamos? (S/N)"
+    $confirm = Read-Host "  Start now? (Y/N)"
     if ($confirm -notmatch '^[SsYy]') {
-        Write-Log "Cancelado por el usuario." "Yellow" "INFO"
+        Write-Log "Canceled by user." "Yellow" "INFO"
         exit 0
     }
 }
 else {
-    Write-Log "Confirmacion omitida por modo automatico." "DarkGray" "AUTO"
+    Write-Log "Confirmation skipped in automatic mode." "DarkGray" "AUTO"
 }
 
-Write-Section "Copiando archivos"
+Write-Section "Copying files"
 $startTime = Get-Date
 
 try {
     Invoke-RecursiveCopy -SourceFolder $storage.GetFolder() -RelativePath ""
 }
 catch {
-    Write-Log "Error inesperado durante la copia: $_" "Red" "FAIL"
+    Write-Log "Unexpected error during copy: $_" "Red" "FAIL"
 }
 
 $duration    = (Get-Date) - $startTime
@@ -559,67 +559,67 @@ $mbPerSec = if ($duration.TotalSeconds -gt 0) { [Math]::Round(($Stats.BytesCopie
 
 Write-Host ""
 Write-Host "  ======================================================" -ForegroundColor Cyan
-Write-Host "                    RESUMEN FINAL                       " -ForegroundColor Cyan
+Write-Host "                    FINAL SUMMARY                       " -ForegroundColor Cyan
 Write-Host "  ======================================================" -ForegroundColor Cyan
-Write-Host ("      Copiados:         {0,-20}" -f $Stats.Copied) -ForegroundColor Green
-Write-Host ("      Ya existian:      {0,-20}" -f $Stats.Skipped) -ForegroundColor Yellow
-Write-Host ("      Carpetas:         {0,-20}" -f $Stats.Folders) -ForegroundColor Cyan
+Write-Host ("      Copied:           {0,-20}" -f $Stats.Copied) -ForegroundColor Green
+Write-Host ("      Already exists:   {0,-20}" -f $Stats.Skipped) -ForegroundColor Yellow
+Write-Host ("      Folders:          {0,-20}" -f $Stats.Folders) -ForegroundColor Cyan
 $errColor = if ($Stats.Errors -gt 0) { "Red" } else { "DarkGray" }
-Write-Host ("      Errores:          {0,-20}" -f $Stats.Errors) -ForegroundColor $errColor
-Write-Host ("      Tiempo total:     {0,-20}" -f $durationStr) -ForegroundColor White
+Write-Host ("      Errors:           {0,-20}" -f $Stats.Errors) -ForegroundColor $errColor
+Write-Host ("      Total time:       {0,-20}" -f $durationStr) -ForegroundColor White
 Write-Host "  ======================================================" -ForegroundColor Cyan
 Write-Host ""
 
 Write-Host "  -- Benchmark" -ForegroundColor DarkGray
-Write-Host ("      MB copiados:      {0}" -f $totalMB) -ForegroundColor White
-Write-Host ("      Archivos/min:     {0}" -f $filesPerMin) -ForegroundColor White
-Write-Host ("      MB/s aprox:       {0}" -f $mbPerSec) -ForegroundColor White
+Write-Host ("      Copied MB:        {0}" -f $totalMB) -ForegroundColor White
+Write-Host ("      Files/min:        {0}" -f $filesPerMin) -ForegroundColor White
+Write-Host ("      Approx MB/s:      {0}" -f $mbPerSec) -ForegroundColor White
 Write-Host ""
-Write-Host "  -- Resumen por destino" -ForegroundColor DarkGray
+Write-Host "  -- Per-destination summary" -ForegroundColor DarkGray
 foreach ($dest in $CONFIG.Destinations) {
     $d = $Stats.PerDestination[$dest]
     Write-Host "  $dest" -ForegroundColor White
-    Write-Host ("      Copiados:    {0}" -f $d.Copied) -ForegroundColor Green
-    Write-Host ("      Ya existian: {0}" -f $d.Skipped) -ForegroundColor Yellow
+    Write-Host ("      Copied:      {0}" -f $d.Copied) -ForegroundColor Green
+    Write-Host ("      Exists:      {0}" -f $d.Skipped) -ForegroundColor Yellow
     $dc = if ($d.Errors -gt 0) { "Red" } else { "DarkGray" }
-    Write-Host ("      Errores:     {0}" -f $d.Errors) -ForegroundColor $dc
+    Write-Host ("      Errors:      {0}" -f $d.Errors) -ForegroundColor $dc
 }
 
 $logResumen = @"
 
   ======================================================
-                    RESUMEN FINAL                       
+                    FINAL SUMMARY
   ======================================================
-      Copiados:         $($Stats.Copied)
-      Ya existian:      $($Stats.Skipped)
-      Carpetas:         $($Stats.Folders)
-      Errores:          $($Stats.Errors)
-      Tiempo total:     $durationStr
+      Copied:           $($Stats.Copied)
+      Already exists:   $($Stats.Skipped)
+      Folders:          $($Stats.Folders)
+      Errors:           $($Stats.Errors)
+      Total time:       $durationStr
   ======================================================
 "@
 try {
     $logResumen | Out-File -FilePath $CONFIG.LogPath -Encoding UTF8 -Append
     "  Benchmark:" | Out-File -FilePath $CONFIG.LogPath -Encoding UTF8 -Append
-    "      MB copiados:      $totalMB" | Out-File -FilePath $CONFIG.LogPath -Encoding UTF8 -Append
-    "      Archivos/min:     $filesPerMin" | Out-File -FilePath $CONFIG.LogPath -Encoding UTF8 -Append
-    "      MB/s aprox:       $mbPerSec" | Out-File -FilePath $CONFIG.LogPath -Encoding UTF8 -Append
-    "  Resumen por destino:" | Out-File -FilePath $CONFIG.LogPath -Encoding UTF8 -Append
+    "      Copied MB:        $totalMB" | Out-File -FilePath $CONFIG.LogPath -Encoding UTF8 -Append
+    "      Files/min:        $filesPerMin" | Out-File -FilePath $CONFIG.LogPath -Encoding UTF8 -Append
+    "      Approx MB/s:      $mbPerSec" | Out-File -FilePath $CONFIG.LogPath -Encoding UTF8 -Append
+    "  Per-destination summary:" | Out-File -FilePath $CONFIG.LogPath -Encoding UTF8 -Append
     foreach ($dest in $CONFIG.Destinations) {
         $d = $Stats.PerDestination[$dest]
         "  - $dest" | Out-File -FilePath $CONFIG.LogPath -Encoding UTF8 -Append
-        "      Copiados:    $($d.Copied)" | Out-File -FilePath $CONFIG.LogPath -Encoding UTF8 -Append
-        "      Ya existian: $($d.Skipped)" | Out-File -FilePath $CONFIG.LogPath -Encoding UTF8 -Append
-        "      Errores:     $($d.Errors)" | Out-File -FilePath $CONFIG.LogPath -Encoding UTF8 -Append
+        "      Copied:      $($d.Copied)" | Out-File -FilePath $CONFIG.LogPath -Encoding UTF8 -Append
+        "      Exists:      $($d.Skipped)" | Out-File -FilePath $CONFIG.LogPath -Encoding UTF8 -Append
+        "      Errors:      $($d.Errors)" | Out-File -FilePath $CONFIG.LogPath -Encoding UTF8 -Append
     }
 } catch {}
 
-Write-Log "=== COPIA FINALIZADA. TIEMPO: $durationStr ===" "Cyan" "INFO"
+Write-Log "=== BACKUP COMPLETED. TIME: $durationStr ===" "Cyan" "INFO"
 
 if ($Stats.Errors -gt 0) {
-    Write-Host "  ATENCION: Algunos archivos no se copiaron. Revisa el log." -ForegroundColor Yellow
+    Write-Host "  WARNING: Some files were not copied. Check the log." -ForegroundColor Yellow
 }
 
-Write-Host "  Log guardado en: $($CONFIG.LogPath)" -ForegroundColor DarkGray
+Write-Host "  Log saved at: $($CONFIG.LogPath)" -ForegroundColor DarkGray
 Write-Host ""
 
 # Liberar correctamente el objeto COM
